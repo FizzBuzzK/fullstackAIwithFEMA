@@ -2,48 +2,58 @@ import { geminiImage } from "@/lib/gemini";
 import { parseGeminiResponse } from "@/lib/responseParser";
 import { computeRiskLevel } from "@/lib/risk";
 
-
-// Optionally extend execution time on Vercel (if needed):
 export const maxDuration = 30; // seconds (Vercel hint)
 
+type Parsed =
+  | {
+      risk_level?: string;
+      description?: string | string[];
+      elevation?: number | string;
+      sfhaTF?: string;
+      image_analysis?: string;
+    }
+  | undefined;
 
-//========================================================
 
-//========================================================
+/**
+ * ===============================================================
+ * @param req 
+ * @returns 
+ * ===============================================================
+ */
 export async function POST(req: Request) {
 
-  try{
+  try {
     const contentType = req.headers.get("content-type") || "";
 
-    if(!contentType.includes("multipart/form-data")){
+    if (!contentType.includes("multipart/form-data")) {
       return Response.json({ error: "Expected multipart/form-data" }, { status: 400 });
     }
 
-    const formData = await req.formData();
 
+    const formData = await req.formData();
     const file = formData.get("file") as File | null;
 
-    
-    //========================= 
+
+    //=========================
     // Error Handlings
     //=========================
-    if(!file){
+    if (!file) {
       return Response.json({ error: "Image file is required (field 'file')" }, { status: 400 });
     }
-
-    if(!file.type.startsWith("image/")){
+    if (!file.type.startsWith("image/")) {
       return Response.json({ error: "File must be an image" }, { status: 400 });
     }
-
-    if(file.size > 10 * 1024 * 1024){
+    if (file.size > 10 * 1024 * 1024) {
       return Response.json({ error: "File size must be less than 10MB" }, { status: 400 });
     }
+
 
     const arrayBuffer = await file.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString("base64");
 
 
-    //========================= 
+    //=========================
     // Prompt
     //=========================
     const prompt = `
@@ -88,11 +98,10 @@ export async function POST(req: Request) {
         `.trim();
 
 
-    //========================= 
+    //=========================
     // Answer
     //=========================
     let aiText = "";
-
     try{
       const ai = await geminiImage(prompt, base64, file.type);
       aiText = ai.text || "";
@@ -101,48 +110,60 @@ export async function POST(req: Request) {
       aiText = "";
     }
 
-    let parsed = parseGeminiResponse(aiText);
-    console.log(parsed);
 
-    const risk_level = computeRiskLevel(parsed.elevation, parsed.sfhaTF);
+    // Parse and normalize into a guaranteed object
+    const candidate: Parsed = parseGeminiResponse(aiText);
 
 
-    //========================= 
-    // Default Answer
-    //=========================
-    if(!aiText){
+    const normalized = {
+      risk_level: String(candidate?.risk_level ?? "UNKNOWN"),
 
-      parsed = {
-        risk_level: "UNKNOWN",
-        description: "No description available",
-        elevation: "UNKNOWN",
-        sfhaTF: "UNKNOWN",
-        image_analysis: "Image analysis was not available. Try again."
-      };
-    }
+      // Normalize description to a single string for consistent downstream usage
+      description: Array.isArray(candidate?.description) ? 
+      candidate?.description.join(" ") : 
+      String(candidate?.description ?? "No description available"),
+
+      // Allow number or string; fall back to "UNKNOWN"
+      elevation:
+        typeof candidate?.elevation === "number" ? 
+        candidate!.elevation : 
+        typeof candidate?.elevation === "string" ? 
+        candidate!.elevation : 
+        "UNKNOWN",
+
+      sfhaTF: String(candidate?.sfhaTF ?? "UNKNOWN"),
+
+      image_analysis: String(
+        candidate?.image_analysis ?? "Image analysis was not available. Try again."
+      ),
+    };
+
+
+    // Compute risk using normalized values
+    const risk_level = computeRiskLevel(normalized.elevation as number | string, normalized.sfhaTF);
+
+
 
     //====================================================
     // Return JSON
     //====================================================
     return Response.json({
-      risk_level: risk_level,
-      description: parsed.description,
-      elevation: parsed.elevation,
-      sfhaTF: parsed.sfhaTF,
-      ai_analysis: parsed.image_analysis + " For more accurate analysis, providing address is highly recommended." || ""
+      risk_level,
+      description: normalized.description,
+      elevation: normalized.elevation,
+      sfhaTF: normalized.sfhaTF,
+      ai_analysis:
+        (normalized.image_analysis + " For more accurate analysis, providing address is highly recommended.") ||
+        "",
     });
-
-  }
+  } 
   catch(err){
+
     console.error("image error:", err);
 
-    //====================================================
-    // Return JSON
-    //====================================================
     return Response.json({ error: "Internal server error" }, { status: 500 });
   }
 
 }
-
 
 
