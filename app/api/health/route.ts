@@ -1,0 +1,13 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+
+export async function GET() {
+
+  return Response.json({
+    status: "healthy",
+    ai_model: "Gemini 1.5 Flash",
+    timestamp: new Date().toISOString(),
+  });
+}
