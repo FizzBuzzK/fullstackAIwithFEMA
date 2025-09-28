@@ -26,7 +26,7 @@ This project combines **real estate listings** with **geospatial + AI-powered fl
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 **Frontend**  
 - Next.js 15 (React 19, App Router)  
