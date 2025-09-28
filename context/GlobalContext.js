@@ -1,3 +1,5 @@
+// context/GlobalContext.js
+
 'use client';
 
 import getUnreadMessageCount from '@/app/actions/getUnreadMessageCount';

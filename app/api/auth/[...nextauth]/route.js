@@ -1,4 +1,4 @@
-// 4-30. Next Auth & Provider Setup
+// app/api/auth/[...nextauth]/route.js
 import { authOptions } from '@/utils/authOptions';
 import NextAuth from 'next-auth/next';
 
