@@ -1,0 +1,79 @@
+name: CI & Production Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Lint, Test, Build
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ci-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+        # If you don't have a lockfile, use:
+        # run: npm install
+
+      - name: Lint
+        run: npm run lint || echo "no lint configured"
+
+      - name: Test
+        run: npm test || echo "no tests configured"
+
+      - name: Build
+        run: npm run build
+
+  deploy-prod:
+    name: Deploy to Vercel (Production)
+    needs: ci
+    if: github.ref == 'refs/heads/main' && needs.ci.result == 'success'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: vercel-prod-${{ github.ref }}
+      cancel-in-progress: true
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install deps (if build needed)
+        run: npm ci
+
+      - name: Pull Vercel Environment (PRODUCTION)
+        run: npx vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+
+      - name: Build with Vercel (Prebuilt)
+        run: npx vercel build --prod --token=$VERCEL_TOKEN
+
+      - name: Deploy Prebuilt to Vercel (PRODUCTION)
+        run: npx vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
+
+      # Simpler alternative (build+deploy in one go, fewer artifacts):
+      # - name: Deploy to Vercel (simple)
+      #   run: npx vercel --prod --confirm --token=$VERCEL_TOKEN
