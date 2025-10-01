@@ -43,9 +43,8 @@ This project combines **real estate listings** with **geospatial + AI-powered fl
 - **Google Maps & Elevation APIs** → Geospatial + elevation analysis  
 - **Google Gemini** → AI image flood risk assessment  
 
-**Deployment**  
-- Dockerized for portability  
-- Runs on **Vercel** or **Google Cloud Run**  
+**Deployment**   
+- Deployed on **Vercel**, implementing CI/CD with **GitHub Actions**
 
 ---
 
